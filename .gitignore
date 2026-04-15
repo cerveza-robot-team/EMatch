@@ -1,0 +1,6 @@
+data/MVSEC/*
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo

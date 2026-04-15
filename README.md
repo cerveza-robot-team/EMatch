@@ -40,7 +40,7 @@ You can refer to the following installation steps:
 
     ```
     conda create -n ematch python=3.8
-    activate ematch
+    conda activate ematch
     ```
 
 2. Install Pytorch and CUDA.
@@ -60,16 +60,36 @@ You can refer to the following installation steps:
 
 ## 🤖️ Checkpoints
 
+### Manually
 You can download all checkpoints here: [Google Drive](https://drive.google.com/drive/folders/1geAMTtWiySkU17SbWa3PH4mkSCinCEk6?usp=sharing) / [BaiduDisk](https://pan.baidu.com/s/1yPLWfswXg9jqxNoWzkrkLw?pwd=pjir)
+
+### Run Script (gdown python package required)
+```
+sh ./script/download_checkpoints.sh
+```
 
 ## 📁 Datasets
 
+### Manually
 Please download the [DSEC](https://dsec.ifi.uzh.ch/) and [MVSEC](https://daniilidis-group.github.io/mvsec/) datasets. 
 
 Details about the datasets can be found in the [data/README.md](./data/README.md) file.
 
+### Run Script (gdown python package required)
+
+#### MVSEC
+```
+sh ./script/download_mvsec_indoor_flying.sh
+```
+
+#### EVB_CIRS
+```
+sh ./script/download_cirs_dataset.sh
+```
 
 ## 📈 Training and Evaluation
+
+### Training and Testing with MVSEC and DSEC datasets
 
 All training and evaluation scripts are provided in the `/scripts` directory. 
 
@@ -88,6 +108,11 @@ You can run the following `.sh` files to train EMatch:
 sh ./scripts/train/unified/dsec_ematch_stage1.sh
 sh ./scripts/train/unified/dsec_ematch_stage2.sh
 sh ./scripts/train/unified/mvsec_ematch.sh
+```
+
+### Testing with EVB_CIRS dataset
+```
+sh ./scripts/evb_cirs/test_evb_cirs.sh
 ```
 
 More scripts are available in the `/scripts` directory. If you wish to conduct further experiments, you may customize the provided `.sh` files to fit your specific requirements.

@@ -4,3 +4,12 @@ data/MVSEC/*
 **/__pycache__/
 **/*.pyc
 **/*.pyo
+
+# Ignore outcomes (e.g., logs, checkpoints, etc.)
+outcomes/*
+
+# Ignore checkpoints
+checkpoints/*
+
+# Ignore data (e.g., downloaded datasets, etc.)
+data/*

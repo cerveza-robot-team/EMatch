@@ -1,0 +1,43 @@
+# ============================================================
+# EMatch — Custom Dataset Config (inference only)
+# ============================================================
+# Fill in the fields marked with TODO before running.
+
+name: 'CIRS_EVB'
+task: 'disparity'           # 'disparity' or 'flow'
+SequenceClass: 'CustomSequence_ematch'
+SequenceNames: ['indoor_flying4_data']   # Arbitrary label(s) used for output folder names.
+                                 # Add more entries if you have multiple recordings.
+
+# Path to your HDF5 file.
+# If you have multiple sequences, each entry in SequenceNames will use the SAME
+# root_path. To use different files, create a separate eval.yaml per recording.
+root_path: '../data/MVSEC/data_hdf5/indoor_flying4_data.hdf5'  # TODO: set this
+
+split: 'test'
+
+# ---- Event window ----
+dt: 100          # Milliseconds of events to accumulate per sample
+voxel_bins: 15   # Temporal bins (must match the trained model's input_dim)
+stride: 100      # Step between consecutive windows in ms (default = dt → no overlap)
+
+# ---- Resolution ----
+# crop_size: target resolution fed to the model.  MUST be divisible by 32.
+# The voxel grids are resized from (sensor_height x sensor_width) to crop_size.
+crop_size: [256, 320]     # TODO: run once with calib_path set — loader prints the correct value for your camera
+
+sensor_height: 256        # TODO: native height of your event camera (pixels)
+sensor_width: 320         # TODO: native width  of your event camera (pixels)
+
+# ---- Stereo calibration (strongly recommended for disparity) ----
+# Path to a Kalibr camchain YAML (cam0 = left, cam1 = right).
+# Without this, events are NOT rectified and disparity output will be incorrect.
+calib_path: '../data/MVSEC/data_hdf5/indoor_flying_calib/camchain-imucam-indoor_flying.yaml'
+
+# ---- HDF5 path overrides (optional) ----
+# By default the loader expects:
+#   davis/left/events   and   davis/right/events
+# as [N, 4] datasets (x, y, t, p) inside your HDF5 file.
+# If your file uses different paths, uncomment and set these:
+event_path_left:  'davis/left/events'
+event_path_right: 'davis/right/events'

@@ -3,7 +3,7 @@
 # Source: https://drive.google.com/drive/folders/1geAMTtWiySkU17SbWa3PH4mkSCinCEk6
 
 FOLDER_ID="1geAMTtWiySkU17SbWa3PH4mkSCinCEk6"
-DEST_DIR="$(cd "$(dirname "$0")/.." && pwd)/checkpoints"
+DEST_DIR="$(cd "$(dirname "$0")/.." && pwd)/checkpoints/ematch"
 
 # Check / install gdown
 if ! python3 -c "import gdown" 2>/dev/null; then

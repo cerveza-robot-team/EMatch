@@ -1,7 +1,8 @@
 #!/bin/sh
 GPU=0
 MODEL="models/configs_model/ematch/disparity.yaml"
-CHECKPOINT="checkpoints/ematch/disparity/mvsec_split3/dsecUnifiedBase/final.pth"
+# CHECKPOINT="checkpoints/ematch/disparity/mvsec_split3/dsecUnifiedBase/final.pth"
+CHECKPOINT="checkpoints/ematch/disparity/dsec/default/stage2/final.pth"
 DATASET="datasets/configs_dataset/ematch/evb_cirs/evb_cirs.yaml"
 SAVE_DIR="outcomes/ematch/custom/CIRS_EVB/default"
 

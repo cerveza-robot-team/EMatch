@@ -107,13 +107,15 @@ class StereoCalibration:
         return d
 
     def _compute_rectification_maps(self, R, t, w, h):
-        # Full stereo rectification: compute R1, R2, P1, P2, Q so that
-        # epipolar lines are horizontal in both rectified images.
-        # alpha=0 → crop to the largest rectangle of fully valid pixels.
+        # alpha=1 preserves the full original FOV so some corners map outside
+        # the sensor → those pixels are invalid.  The map-check below then finds
+        # the true valid-overlap rectangle.  alpha=0 would zoom to avoid black
+        # borders, making every output pixel "valid" and returning the full image
+        # as valid_roi (useless for cropping).
         R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
             self.K_left,  self.D_left,
             self.K_right, self.D_right,
-            (w, h), R, t, alpha=0
+            (w, h), R, t, alpha=0.5, flags=cv2.CALIB_ZERO_DISPARITY
         )
 
         map_l_x, map_l_y = cv2.initUndistortRectifyMap(
@@ -122,21 +124,31 @@ class StereoCalibration:
             self.K_right, self.D_right, R2, P2, (w, h), cv2.CV_32FC1)
 
         # Compute valid ROI directly from the remap maps.
-        # cv2.stereoRectify's roi1/roi2 are unreliable with large rotations
-        # (e.g. toe-in rigs) and often return the full-frame rectangle even
-        # when corners have been rotated out of bounds.  Checking the maps
-        # directly — keeping only rows/cols where EVERY pixel maps back inside
-        # the original sensor — gives the true tight crop.
+        # A pixel is valid if its remap coordinate falls inside the original sensor.
         valid_l = ((map_l_x >= 0) & (map_l_x <= w - 1) &
                    (map_l_y >= 0) & (map_l_y <= h - 1))
         valid_r = ((map_r_x >= 0) & (map_r_x <= w - 1) &
                    (map_r_y >= 0) & (map_r_y <= h - 1))
         valid   = valid_l & valid_r
 
-        row_mask = np.all(valid, axis=1)
-        col_mask = np.all(valid, axis=0)
+        # Bounding box of the valid overlap region.
+        # np.any gives the loosest (largest) axis-aligned bounding box — any row/col
+        # that contains at least one valid pixel is included.  Events that land on
+        # the few invalid pixels near the border are discarded by the explicit
+        # bounds check in rectify_events(), so this does not hurt data quality.
+        row_mask = np.any(valid, axis=1)
+        col_mask = np.any(valid, axis=0)
         rows = np.where(row_mask)[0]
         cols = np.where(col_mask)[0]
+
+        if rows.size == 0 or cols.size == 0:
+            raise RuntimeError(
+                "No valid stereo overlap found after rectification. "
+                f"Left  map coverage: {valid_l.mean():.1%}  "
+                f"Right map coverage: {valid_r.mean():.1%}  "
+                "Check that the calibration YAML extrinsics are correct."
+            )
+
         roi_x  = int(cols[0]);  roi_y  = int(rows[0])
         roi_w  = int(cols[-1] - cols[0] + 1)
         roi_h  = int(rows[-1] - rows[0] + 1)

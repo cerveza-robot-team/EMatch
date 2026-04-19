@@ -13,3 +13,5 @@ checkpoints/*
 
 # Ignore data (e.g., downloaded datasets, etc.)
 data/*
+datasets/DSEC/__pycache__/*
+datasets/DSEC/__pycache__/DSECSequence_ematch_disparity.cpython-38.pyc

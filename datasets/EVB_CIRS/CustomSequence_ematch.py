@@ -245,10 +245,14 @@ class CustomSequence_ematch(Dataset):
             _, _, roi_w, roi_h = self.calib.valid_roi
             voxel_h, voxel_w = roi_h, roi_w
 
-            if events.shape[0] < 2:
-                return np.zeros((self.voxel_bins, voxel_h, voxel_w), dtype=np.float32)
-
-            # events = self.calib.rectify_events(events, side)
+            if side == 'left':
+                side = 'right'  # calibrate left events to right camera
+            elif side == 'right':
+                side = 'left'   # calibrate right events to left camera
+            events = self.calib.rectify_events(events, side)
+            # crop only valid events in both left and right cameras, to avoid introducing artifacts from zero-padding
+            events = events[(events[:, 0] >= 0) & (events[:, 0] < roi_w) &
+                            (events[:, 1] >= 0) & (events[:, 1] < roi_h)]
             if events.shape[0] < 2:
                 return np.zeros((self.voxel_bins, voxel_h, voxel_w), dtype=np.float32)
         else:

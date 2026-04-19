@@ -24,7 +24,8 @@ stride: 100      # Step between consecutive windows in ms (default = dt → no o
 # ---- Resolution ----
 # crop_size: target resolution fed to the model.  MUST be divisible by 32.
 # The voxel grids are resized from (sensor_height x sensor_width) to crop_size.
-crop_size: [512, 960]     # TODO: run once with calib_path set — loader prints the correct value for your camera
+#crop_size: [512, 960]     # TODO: run once with calib_path set — loader prints the correct value for your camera
+crop_size: [256, 320]
 
 sensor_height: 720        # TODO: native height of your event camera (pixels)
 sensor_width: 1280         # TODO: native width  of your event camera (pixels)

@@ -248,7 +248,7 @@ class CustomSequence_ematch(Dataset):
             if events.shape[0] < 2:
                 return np.zeros((self.voxel_bins, voxel_h, voxel_w), dtype=np.float32)
 
-            # events = self.calib.rectify_events(events, side)
+            events = self.calib.rectify_events(events, side)
             if events.shape[0] < 2:
                 return np.zeros((self.voxel_bins, voxel_h, voxel_w), dtype=np.float32)
         else:

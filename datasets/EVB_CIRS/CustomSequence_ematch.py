@@ -135,6 +135,8 @@ class CustomSequence_ematch(Dataset):
         self.sensor_h = cfgs['sensor_height']
         self.sensor_w = cfgs['sensor_width']
         self.stride = cfgs.get('stride', self.dt)  # ms between windows
+        self.expected_disparity = cfgs.get('expected_disparity_at_1m', None)  # for extrinsics sanity check
+        self.alpha = cfgs.get('alpha', 0.5)  # for disparity shift correction based on expected disparity at 1m
 
         crop_h, crop_w = self.crop_size
         assert crop_h % 32 == 0 and crop_w % 32 == 0, (
@@ -150,7 +152,7 @@ class CustomSequence_ematch(Dataset):
         # Optional stereo calibration for event rectification
         calib_path = cfgs.get('calib_path', None)
         if calib_path:
-            self.calib = StereoCalibration(calib_path)
+            self.calib = StereoCalibration(calib_path, alpha=self.alpha, expected_disparity=self.expected_disparity)
             print(f'Loaded stereo calibration from {calib_path}')
         else:
             self.calib = None
@@ -245,10 +247,6 @@ class CustomSequence_ematch(Dataset):
             _, _, roi_w, roi_h = self.calib.valid_roi
             voxel_h, voxel_w = roi_h, roi_w
 
-            if side == 'left':
-                side = 'right'  # calibrate left events to right camera
-            elif side == 'right':
-                side = 'left'   # calibrate right events to left camera
             events = self.calib.rectify_events(events, side)
             # crop only valid events in both left and right cameras, to avoid introducing artifacts from zero-padding
             events = events[(events[:, 0] >= 0) & (events[:, 0] < roi_w) &

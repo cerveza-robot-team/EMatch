@@ -41,9 +41,13 @@ import cv2
 
 
 class StereoCalibration:
-    def __init__(self, yaml_path: str):
+    def __init__(self, yaml_path: str, alpha: float = 0.5, expected_disparity = None):
         with open(yaml_path, 'r') as f:
             calib = yaml.safe_load(f)
+            
+            
+        self.alpha = alpha  # rectification parameter: 0 = zoom in to valid region, 1 = keep full FOV (some invalid pixels)
+        self.expected_disparity = expected_disparity  # for sanity check of extrinsics
 
         cam0 = calib['cam0']
         cam1 = calib['cam1']
@@ -69,6 +73,10 @@ class StereoCalibration:
         T = np.array(cam1['T_cn_cnm1'], dtype=np.float64)  # 4x4
         R = T[:3, :3]   # rotation from cam0 → cam1
         t = T[:3, 3]    # translation of cam1 origin in cam0 frame
+        print(f'  Extrinsics (cam1 in cam0 frame):\n{T}')
+        print(f'  Rotation R:\n{R}')
+        print(f'  Translation t: {t}  (baseline in meters, for sanity check: {np.linalg.norm(t):.3f} m)')
+        self.baseline_t = np.linalg.norm(t)  # baseline in meters (for sanity check)
 
         # --- image size ---
         w, h = cam0['resolution']
@@ -79,8 +87,19 @@ class StereoCalibration:
             self.valid_roi = self._compute_rectification_maps(R, t, w, h)
         self.R_rect_left = self.R_rect   # alias for clarity
 
-        self.baseline = float(np.abs(self.Q[3, 2]))   # 1/baseline (from Q matrix)
-        self.focal_length_x = float(self.Q[2, 3])     # focal length after rectification
+        self.focal_length_x = float(self.P_rect[0, 0])  # focal length in pixels (from rectified projection matrix)
+        
+        self.disparity_at_1m = (self.focal_length_x * self.baseline_t) / 1.0
+        
+        self.shift_at_1m = None
+        if self.expected_disparity is not None:
+            self.shift_at_1m = self.disparity_at_1m - self.expected_disparity
+        print(f'  Focal length (rectified): {self.focal_length_x:.2f} px')
+        print(f'  Disparity at 1m (from calib): {self.disparity_at_1m:.2f} px')
+        if self.expected_disparity is not None:
+            print(f'  Expected disparity at 1m (from extrinsics sanity check): {self.expected_disparity:.2f} px')
+            print(f'  Disparity shift at 1m (calib - expected): {self.shift_at_1m:.2f} px')
+            print(f'  Shifting rectified x-coordinates by {self.shift_at_1m:.2f} px to align with expected disparity at 1m.')
 
         # Suggest a crop_size that fits inside the valid rectified region,
         # is divisible by 32, and preserves the sensor aspect ratio as closely as possible.
@@ -115,7 +134,7 @@ class StereoCalibration:
         R1, R2, P1, P2, Q, roi1, roi2 = cv2.stereoRectify(
             self.K_left,  self.D_left,
             self.K_right, self.D_right,
-            (w, h), R, t, alpha=0.5, flags=cv2.CALIB_ZERO_DISPARITY
+            (w, h), R, t, alpha=self.alpha, flags=cv2.CALIB_ZERO_DISPARITY
         )
 
         map_l_x, map_l_y = cv2.initUndistortRectifyMap(
@@ -206,6 +225,13 @@ class StereoCalibration:
         x_rect = np.round(rmap[ys, xs, 0]).astype(np.int32)
         y_rect = np.round(rmap[ys, xs, 1]).astype(np.int32)
 
+        if self.expected_disparity is not None and self.shift_at_1m is not None:
+            # Shift both left and right rectified x-coordinates by the same amount to align the disparity with the expected value at 1m.
+            if side == 'left':
+                x_rect -= int(self.shift_at_1m / 2)
+            else:
+                x_rect += int(self.shift_at_1m / 2)
+
         # Keep only events inside the valid stereo ROI
         valid = (
             (x_rect >= roi_x) & (x_rect < roi_x + roi_w) &
@@ -216,5 +242,6 @@ class StereoCalibration:
         # Shift so ROI top-left maps to (0, 0)
         rectified[:, 0] = x_rect[valid] - roi_x
         rectified[:, 1] = y_rect[valid] - roi_y
+        
 
         return rectified

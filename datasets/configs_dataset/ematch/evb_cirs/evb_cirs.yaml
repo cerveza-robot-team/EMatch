@@ -12,7 +12,7 @@ SequenceNames: ['1_0m_outdoor_a_0_0_d_512_s_128_dt50']   # Arbitrary label(s) us
 # Path to your HDF5 file.
 # If you have multiple sequences, each entry in SequenceNames will use the SAME
 # root_path. To use different files, create a separate eval.yaml per recording.
-root_path: 'data/EVB_CIRS/hdf5/1_0m_out.hdf5'  # TODO: set this
+root_path: '../data/EVB_CIRS/hdf5/1_0m_out.hdf5'  # TODO: set this (dataset lives at workspace-root data/)
 
 split: 'test'
 
@@ -35,7 +35,7 @@ sensor_width: 1280         # TODO: native width  of your event camera (pixels)
 # ---- Stereo calibration (strongly recommended for disparity) ----
 # Path to a Kalibr camchain YAML (cam0 = left, cam1 = right).
 # Without this, events are NOT rectified and disparity output will be incorrect.
-calib_path: 'data/EVB_CIRS/calibration/camchain-cirs_evb.yaml'
+calib_path: '../data/EVB_CIRS/calibration/camchain-cirs_evb.yaml'
 
 # ---- HDF5 path overrides (optional) ----
 # By default the loader expects:

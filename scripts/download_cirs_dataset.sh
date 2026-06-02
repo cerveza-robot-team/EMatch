@@ -1,10 +1,10 @@
 #!/bin/bash
 # Download EVB_CIRS dataset from Google Drive
 # Source: https://drive.google.com/drive/folders/15txu3yOlk4LFCiBwH4UywvB3dzhrvVbT
-# Expected destination: data/EVB_CIRS/
+# Expected destination: <workspace>/data/EVB_CIRS/  (one level above the EMatch repo)
 
 FOLDER_ID="15txu3yOlk4LFCiBwH4UywvB3dzhrvVbT"
-DEST_DIR="$(cd "$(dirname "$0")/.." && pwd)/data/EVB_CIRS"
+DEST_DIR="$(cd "$(dirname "$0")/../.." && pwd)/data/EVB_CIRS"
 
 # Check / install gdown
 if ! python3 -c "import gdown" 2>/dev/null; then

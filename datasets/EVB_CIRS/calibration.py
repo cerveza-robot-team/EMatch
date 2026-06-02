@@ -28,11 +28,16 @@ Expected YAML structure (two cameras, cam0 = left, cam1 = right):
         - [0,   0,   0,   1 ]
 
 After loading, `StereoCalibration` provides:
-    left_map  : (H, W, 2) float32  — cv2.remap map for left camera
-    right_map : (H, W, 2) float32  — cv2.remap map for right camera
-    R_rect    : (3, 3)              — rectification rotation (left camera)
-    P_rect    : (3, 4)              — rectified projection matrix (left camera)
-    Q         : (4, 4)              — disparity-to-depth mapping matrix
+    left_map          : (H, W, 2) float32  — INVERSE map for cv2.remap (images)
+    right_map         : (H, W, 2) float32  — INVERSE map for cv2.remap (images)
+    left_forward_map  : (H, W, 2) float32  — FORWARD map (distorted -> rectified)
+    right_forward_map : (H, W, 2) float32  — FORWARD map (distorted -> rectified)
+    R_rect            : (3, 3)              — rectification rotation (left camera)
+    P_rect            : (3, 4)              — rectified projection matrix (left camera)
+    Q                 : (4, 4)              — disparity-to-depth mapping matrix
+
+Direction matters: rectify_image uses the inverse map (output-pixel iteration);
+rectify_events uses the forward map (per-event lookup at distorted coords).
 """
 
 import yaml
@@ -83,8 +88,18 @@ class StereoCalibration:
         self.image_size = (w, h)
 
         # --- compute stereo rectification ---
-        self.left_map, self.right_map, self.R_rect, self.R_rect_right, self.P_rect, self.Q, \
-            self.valid_roi = self._compute_rectification_maps(R, t, w, h)
+        # `left_map`/`right_map` are INVERSE maps (rectified -> distorted) used by
+        # cv2.remap for images and by the ROI computation. `left_forward_map`/
+        # `right_forward_map` are FORWARD maps (distorted -> rectified) used by
+        # rectify_events: events live in distorted-sensor coordinates and need
+        # to be transformed to rectified coordinates. Using the inverse map for
+        # events lands them at the wrong rectified pixels (the asymmetry between
+        # forward and inverse maps grows with rectification rotation and lens
+        # distortion, and on the CIRS rig can exceed several hundred pixels).
+        (self.left_map, self.right_map,
+         self.left_forward_map, self.right_forward_map,
+         self.R_rect, self.R_rect_right, self.P_rect, self.Q,
+         self.valid_roi) = self._compute_rectification_maps(R, t, w, h)
         self.R_rect_left = self.R_rect   # alias for clarity
 
         self.focal_length_x = float(self.P_rect[0, 0])  # focal length in pixels (from rectified projection matrix)
@@ -142,6 +157,20 @@ class StereoCalibration:
         map_r_x, map_r_y = cv2.initUndistortRectifyMap(
             self.K_right, self.D_right, R2, P2, (w, h), cv2.CV_32FC1)
 
+        # Forward maps for per-event rectification: at distorted pixel (x_d, y_d)
+        # the value is the rectified coordinate (x_r, y_r). Same convention as
+        # MVSEC's shipped *_x_map.txt / *_y_map.txt.
+        xs_grid = np.arange(w, dtype=np.float32)
+        ys_grid = np.arange(h, dtype=np.float32)
+        xx, yy = np.meshgrid(xs_grid, ys_grid)
+        pts = np.stack([xx, yy], axis=-1).reshape(-1, 1, 2).astype(np.float32)
+        fwd_l = cv2.undistortPoints(pts, self.K_left, self.D_left,
+                                    R=R1, P=P1[:3, :3]).reshape(h, w, 2)
+        fwd_r = cv2.undistortPoints(pts, self.K_right, self.D_right,
+                                    R=R2, P=P2[:3, :3]).reshape(h, w, 2)
+        left_forward_map  = fwd_l.astype(np.float32)  # (H, W, 2)
+        right_forward_map = fwd_r.astype(np.float32)  # (H, W, 2)
+
         # Compute valid ROI directly from the remap maps.
         # A pixel is valid if its remap coordinate falls inside the original sensor.
         valid_l = ((map_l_x >= 0) & (map_l_x <= w - 1) &
@@ -173,11 +202,13 @@ class StereoCalibration:
         roi_h  = int(rows[-1] - rows[0] + 1)
         valid_roi = (roi_x, roi_y, roi_w, roi_h)
 
-        # Stack into (H, W, 2) — same convention as MVSEC calibration
+        # Inverse maps (for cv2.remap on images, and for ROI computation above).
         left_map  = np.stack([map_l_x, map_l_y], axis=2)  # (H, W, 2)
         right_map = np.stack([map_r_x, map_r_y], axis=2)  # (H, W, 2)
 
-        return left_map, right_map, R1, R2, P1, Q, valid_roi
+        return (left_map, right_map,
+                left_forward_map, right_forward_map,
+                R1, R2, P1, Q, valid_roi)
 
     @staticmethod
     def _suggest_crop_size(valid_roi):
@@ -203,14 +234,15 @@ class StereoCalibration:
 
     def rectify_events(self, events: np.ndarray, side: str) -> np.ndarray:
         """
-        Remap event (x, y) coordinates using the precomputed rectification maps,
-        crop to the valid stereo ROI, and shift coordinates so (0, 0) is the ROI origin.
+        Remap event (x, y) coordinates using the precomputed FORWARD rectification
+        map (distorted -> rectified), crop to the valid stereo ROI, and shift
+        coordinates so (0, 0) is the ROI origin.
 
         :param events: [N, 4] array (x, y, t, p)
         :param side:   'left' or 'right'
         :return:       [M, 4] array with rectified (x, y) in ROI-local coordinates
         """
-        rmap = self.left_map if side == 'left' else self.right_map
+        rmap = self.left_forward_map if side == 'left' else self.right_forward_map
         w, h = self.image_size
         roi_x, roi_y, roi_w, roi_h = self.valid_roi
 
@@ -221,12 +253,18 @@ class StereoCalibration:
         xs = np.clip(xs, 0, w - 1)
         ys = np.clip(ys, 0, h - 1)
 
-        # Look up rectified coordinates
+        # Look up rectified coordinates via the forward map.
         x_rect = np.round(rmap[ys, xs, 0]).astype(np.int32)
         y_rect = np.round(rmap[ys, xs, 1]).astype(np.int32)
 
         if self.expected_disparity is not None and self.shift_at_1m is not None:
-            # Shift both left and right rectified x-coordinates by the same amount to align the disparity with the expected value at 1m.
+            # Reduce the rectified disparity at 1m by `shift_at_1m` (= calib - expected).
+            # Disparity is x_left - x_right; subtracting from x_left and adding to
+            # x_right yields:  new_d = (x_L - s/2) - (x_R + s/2) = old_d - s,
+            # so a 1m feature lands at the expected_disparity_at_1m configured by
+            # the dataset YAML. The shift is uniform across depths (additive on
+            # disparity), so only ~1m features land exactly on-distribution; closer
+            # / farther features shift by the same constant.
             if side == 'left':
                 x_rect -= int(self.shift_at_1m / 2)
             else:

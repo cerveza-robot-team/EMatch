@@ -33,12 +33,12 @@ from datasets.EVB_CIRS.calibration import StereoCalibration  # type: ignore  # n
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
 
-HDF5_PATH        = os.path.join(HDF5_DIR, "new.hdf5")
+HDF5_PATH        = os.path.join(HDF5_DIR, "1_0m_out.hdf5")
 CONFIG_YAML_PATH        = os.path.join(CONFIG_PATH, "camchain-cirs_evb.yaml")
 OUT_MAP_L        = os.path.join(CONFIG_PATH, "rectify_maps_left.npz")
 OUT_MAP_R        = os.path.join(CONFIG_PATH, "rectify_maps_right.npz")
-OUT_VIDEO        = os.path.join(DATASET_ROOT, "render", "stereo_rectified.mp4")
-OUT_VIDEO_OVERLAY = os.path.join(DATASET_ROOT, "render", "stereo_overlay.mp4")
+OUT_VIDEO        = os.path.join(DATASET_ROOT, "render", "stereo_rectified_1m_outdoor_64.mp4")
+OUT_VIDEO_OVERLAY = os.path.join(DATASET_ROOT, "render", "stereo_overlay_1m_outdoor_64.mp4")
 
 # ─── Rendering parameters ────────────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ def load_events(path, dataset="CD/events"):
 def main():
     # ── Load stereo calibration ──────────────────────────────────────────────
     print("Loading stereo calibration …")
-    calib = StereoCalibration(CONFIG_YAML_PATH)
+    calib = StereoCalibration(CONFIG_YAML_PATH, expected_disparity=64)
 
     W, H = calib.image_size
 
@@ -115,7 +115,7 @@ def main():
     print(f"Right K :\n{np.round(calib.K_right, 2)}")
     print(f"Right D : {np.round(calib.D_right,  4)}")
     print(f"Rectified focal length : {calib.focal_length_x:.2f} px")
-    print(f"Baseline               : {calib.baseline * 100:.2f} cm")
+    print(f"Baseline               : {calib.baseline_t * 100:.2f} cm")
 
     # ── Use StereoCalibration rectification maps and valid ROI ───────────────
     # calib already computed full stereo rectification maps (undistort + rectify)
@@ -231,7 +231,7 @@ def main():
 
     print("\n=== Rectification Summary ===")
     print(f"Rectified focal length : {calib.focal_length_x:.2f} px")
-    print(f"Baseline               : {calib.baseline * 100:.2f} cm")
+    print(f"Baseline               : {calib.baseline_t * 100:.2f} cm")
     print(f"Crop region            : {crop_w} x {crop_h}  (offset {crop_x0}, {crop_y0})")
     print(f"Output video size      : {2*crop_w} x {crop_h}  (side-by-side)")
 

@@ -6,20 +6,20 @@
 name: 'EVB_CIRS'
 task: 'disparity'           # 'disparity' or 'flow'
 SequenceClass: 'CustomSequence_ematch'
-SequenceNames: ['move2_a_0_0_disp_222_dsec_param']   # Arbitrary label(s) used for output folder names.
+SequenceNames: ['1_0m_outdoor_a_0_0_d_512_s_128_dt50']   # Arbitrary label(s) used for output folder names.
                                  # Add more entries if you have multiple recordings.
 
 # Path to your HDF5 file.
 # If you have multiple sequences, each entry in SequenceNames will use the SAME
 # root_path. To use different files, create a separate eval.yaml per recording.
-root_path: 'data/EVB_CIRS/hdf5/move2.hdf5'  # TODO: set this
+root_path: 'data/EVB_CIRS/hdf5/1_0m_out.hdf5'  # TODO: set this
 
 split: 'test'
 
 # ---- Event window ----
-dt: 100          # Milliseconds of events to accumulate per sample
+dt: 50          # Milliseconds of events to accumulate per sample
 voxel_bins: 15   # Temporal bins (must match the trained model's input_dim)
-stride: 50      # Step between consecutive windows in ms (default = dt → no overlap)
+stride: 33      # Step between consecutive windows in ms (default = dt → no overlap)
 
 # ---- Resolution ----
 # crop_size: target resolution fed to the model.  MUST be divisible by 32.
@@ -45,6 +45,6 @@ calib_path: 'data/EVB_CIRS/calibration/camchain-cirs_evb.yaml'
 event_path_left:  'evk4_hd/left/events'
 event_path_right: 'evk4_hd/right/events'
 
-expected_disparity_at_1m: 64  # Optional sanity check for extrinsics. Set to None to disable. (px)
+expected_disparity_at_1m: 128  # Optional sanity check for extrinsics. Set to None to disable. (px)
 alpha: 0.0  # Optional correction factor (0-1) to shift rectified events based on expected disparity at 1m. Set to 0 to disable. (default=0.5 → shift by half the expected disparity)
-disp_vmax: 222  # Max disparity for visualization (px). Adjust based on your scene and expected depth range.
+disp_vmax: 512  # Max disparity for visualization (px). Adjust based on your scene and expected depth range.

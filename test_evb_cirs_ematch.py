@@ -88,11 +88,25 @@ def main(args):
         print(f'\nProcessing sequence: {seq_name}  ({len(dataset)} windows)')
 
         visual_path = os.path.join(args.save_dir, 'visual', seq_name)
+        npy_path = os.path.join(args.save_dir, 'npy', seq_name)
         os.makedirs(visual_path, exist_ok=True)
+        os.makedirs(npy_path, exist_ok=True)
 
         if args.event_voxel:
             voxel_path = os.path.join(args.save_dir, 'voxel', seq_name)
             os.makedirs(voxel_path, exist_ok=True)
+
+        # Pre-rectification disparity shift applied by loader (left x -= s/2, right x += s/2,
+        # both integer-rounded). Net effect on disparity: d_input = d_true - s_applied,
+        # where s_applied = 2 * int(shift_at_1m / 2). Undo here so saved/visualized
+        # disparity is in true rectified-image coordinates.
+        s_applied = 0
+        if args.task == 'disparity':
+            calib = getattr(dataset, 'calib', None)
+            shift = getattr(calib, 'shift_at_1m', None) if calib is not None else None
+            if shift is not None:
+                s_applied = 2 * int(shift / 2)
+                print(f'  Undoing pre-rectification disparity shift: +{s_applied} px')
 
         with torch.no_grad():
             for i in tqdm(range(len(dataset))):
@@ -114,13 +128,19 @@ def main(args):
                 results_dict = model(voxel_0, voxel_1, task=args.task)
 
                 if args.task == 'disparity':
-                    pred = results_dict['disparity_preds'][-1][0]  # [H, W]
-                    img = tensor_to_disparity_jet_image(pred.cpu(), vmax=args.disp_vmax)
+                    pred = results_dict['disparity_preds'][-1][0].cpu()  # [H, W]
+                    if s_applied != 0:
+                        pred = pred + s_applied
+                    pred_np = pred.numpy().astype(np.float32)
+                    np.save(os.path.join(npy_path, f'{str(i).zfill(6)}.npy'), pred_np)
+                    img = tensor_to_disparity_jet_image(pred, vmax=args.disp_vmax)
                     img.save(os.path.join(visual_path, f'{str(i).zfill(6)}.jpg'))
 
                 elif args.task == 'flow':
-                    pred = results_dict['flow_preds'][-1][0]  # [2, H, W]
-                    rgb = flow_tensor_to_image(pred.cpu()).transpose(1, 2, 0)
+                    pred = results_dict['flow_preds'][-1][0].cpu()  # [2, H, W]
+                    pred_np = pred.numpy().astype(np.float32)
+                    np.save(os.path.join(npy_path, f'{str(i).zfill(6)}.npy'), pred_np)
+                    rgb = flow_tensor_to_image(pred).transpose(1, 2, 0)
                     cv2.imwrite(
                         os.path.join(visual_path, f'{str(i).zfill(6)}.png'),
                         cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
